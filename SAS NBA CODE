@@ -1,0 +1,269 @@
+/*
+ Rui Pang 07/11/20190
+ *I am a big fan of basketball. In addition, I noticed that powerful team have to
+ * have a powerful weapon to win the game, like rebounds, 3-points and so on.
+ * I concern about higher 3-Point attempting rate whether are the factor for winning game or not.
+ * That analyzation could explains the current tendency for the basketball.
+ * Here are variables I will use for analyzation:
+ * 3PAr(Percentage of FG Attempts from 3-Point Range)
+ * W(Total game wins)
+ */
+
+
+/*
+This data set recorded average team statistics and informations
+for whole 30 observations(NBA teams) in season 2018-2019 where I found in basketball-reference.com.
+This data set contains 25 variables to display the overall status for each NBA teams.
+Each team will have 82 games for whole season.
+*/
+proc datasets library=work kill noprint;
+	run;
+quit;
+
+filename mynba url 
+	"https://raw.githubusercontent.com/ruipang123/stat479/master/nnba.csv" 
+	termstr=lf;
+
+/*
+This is a part that I import team shooting data from 2018-2019 season .
+*/
+filename myshoot url 
+	"https://raw.githubusercontent.com/ruipang123/stat479/master/Shoot" termstr=lf;
+
+/*
+This is a part that importing NBA League Averages Data for each season.
+*/
+filename myseason url 
+	"https://raw.githubusercontent.com/ruipang123/stat479/master/season%20summary" 
+	termstr=lf;
+
+/*
+ * This data step helps me to create a data set called nbafinal.
+ * Nbafinal contains 28 variables and 30 obervations.
+ * In addition, I created a new variable caller winrate which using the number of
+ * winning games divided by total number of games(82) to have the rate of winning
+ * for each team.
+ */
+data nbafinal;
+	infile MYNBA delimiter=',' MISSOVER DSD lrecl=32767 firstobs=2;
+	informat Rk best32. Team $23. Age best32. 
+	W best32.  L best32. PW best32. 
+	PL best32. MOV best32. SOS best32. 
+	SRS best32. ORtg best32. DRtg best32. 
+	NRtg best32. Pace best32. FTr best32. 
+	threeAr best32. TS best32. OeFG best32. 
+	OTOV best32. ORB best32. OFT best32. 
+	DeFG best32. DTOV best32. DRB best32. 
+	DFT best32. Arena $26. Attend best32. AttendG best32.;
+	input Rk team $ age W L PW PL MOV SOS SRS ORtg DRtg NRtg Pace FTr threeAr TS 
+		OeFG OTOV ORB OFT DeFG DTOV DRB DFT Arena $ Attend AttendG;
+	Winrate=w/82;
+	label w="Wins" l="Lost" team="Team Name";
+run;
+
+/*
+ * This data step creates a date set called shoot for each team's
+ * shooting statistic from 2018-2019 season.
+ * Shoot contains 25 variables and 30 observations(NBA teams).
+ */
+data WORK.SHOOT;
+	infile MYSHOOT delimiter=',' MISSOVER DSD lrecl=32767 firstobs=2;
+	input Rk :2. Team :$23. G :5. MP :5.2 FG :5.2 FGA :5.2 FGper :5. threeP :5.2 
+		threePA :5.2 threePP :5.2 twoP :5.2 twoPA :5.2 PPN :5.2 FT :5.2 FTA :5.2 
+		FTP :5.2 ORB :5.2 DRB :5.2 TRB :5.2 AST :5.2 STL :5.2 BLK :5.2 TOV :5.2 
+		PF :5.2 PTS :5.2;
+run;
+
+
+/*
+ * This data step creates a date set called season for league statistic from each season(2010-2019).
+ * Season contains 4 variables and 9 observations(NBA teams).
+ */
+
+data WORK.SEASON;
+	infile MYSEASON delimiter=',' MISSOVER DSD lrecl=32767 firstobs=2;
+	input Rk :2. Season  :$7. Lg  :$3. Age :4.1 Ht :$3. Wt :3. Game :5. MP :5.1 
+		FG :4.1 FGA :4.1 ThrPFG :4.1 Attempts :4.1 FT :4.1 FTA :4.1 ORB :4.1 DRB :4.1 
+		TRB :4.1 AST :4.1 STL :3.1 BLK :3.1 TOV :4.1 PF :4.1 PTS :5.1 FGper :5.3 
+		threepp :5.3 FTper :5.3 Pace :5.1 eFG :5.3 TOVPER :4.1 ORBper :4.1 FTPA 5.3 
+		ORtg :5.1;
+	keep Season ThrPFG Attempts PTS;
+run;
+
+/*
+ * This proc sort step will help me to
+ * sort season as increasing order.
+ * That could help me to make the plot more
+ * clearly.
+ */
+proc sort data=work.season out=sortsea;
+	by season;
+run;
+
+/*
+ * This proc step creates a graph that contains vertical bars and series lines
+ * for league statistic from each season(2010-2019).
+ * Seasons are my independent variable which is x-axis.
+ * Vertical Bar's dependent variable is average game points.
+ * Blue Series line's  dependent variable is average number of 3-point filed goal attempting.
+ * Red Series line's  dependent variable is average number of 3-point filed goals.
+ * Left side of y-axis is points per game which is the measurement for vertical bar.
+ * The other side is number of three-point shot that is the measurement for series lines.
+ * Red line with circle marks represent the number of three-point field goals per game.
+ * Blue line with star marks represent the number of three-point shot attempting.
+ */
+proc sgplot data=sortsea;
+	title 'League Season summary';
+	footnote 'Summary data form basketball-reference.com';
+	vbarparm category=season response=PTS/ datalabel datalabelpos=data;
+	series x=season y=Attempts/ y2axis markers datalabel=Attempts 
+		lineattrs=(color=blue) markerattrs=(symbol=Star color=blue) datalabelpos=top;
+	series x=season y=thrPFG/ y2axis markers datalabel=thrPFG 
+		lineattrs=(color=red) markerattrs=(color=red) datalabelpos=top;
+	yaxis values=(85 to 115 by 1) label='Points Per Game';
+	y2axis values=(0 to 34 by 1) label='Number of 3-Point Shot';
+	inset 'Attempts of 3-Point per game: blue star' 
+		/title='Reference line represent:' titleattrs=(weight=bold) valuealign=center 
+		position=topleft textattrs=(color=blue);
+	inset '   ' '    ' '3-Point Field Goals Per Game: red circle'/ 
+		position=topleft textattrs=(color=red);
+run;
+
+title;
+footnote;
+
+/*
+ * These two proc sort steps are the preparation for my next data merge step.
+ * Sort nbafinal and shoot by team name.
+ */
+proc sort data=nbafinal out=realnbas;
+	by team;
+run;
+
+proc sort data=shoot out=sortshoot;
+	by team;
+run;
+
+/*
+ * This data step merged realnbas and sortshoot together,
+ * and creates a new data set called bignba.
+ * Bigba has a new variables called playoff.
+ * I used if statement to separated team to two groups.
+ * I created threpp to represent the percentage of 3-point field goals
+ * by multiply 100 from the decimal representation.
+ */
+data Bignba;
+	merge realnbas sortshoot;
+	by team;
+	threpp=threepp*100;
+	if find (team, '*') then
+		playoff='Yes';
+	else
+		playoff='No';
+	keep team age W L Winrate playoff threpp threePA threepp threep;
+run;
+
+/*
+ * These proc sort steps is the preparation for my next plot step.
+ * Sort bignba by winning rate, because I will use the winning rate as
+ * independent variables to make scatter plot.
+ */
+
+proc sort data=bignba out=sortwin;
+	by descending winrate;
+run;
+
+/*
+ * This proc mean step gives me the data that
+ * I will need for scatter graph's reference line.
+ * This proc step calculated the mean percentage
+ * of 3-point field goals per game by group of playoff.
+ */
+proc means data=bignba;
+	var threpp;
+	class playoff;
+	output out=meanthre;
+run;
+
+/*
+ * These macro variables store the
+ * mean percentage of 3-point field
+ * goals per game by group of playoff
+ * and non-playoff teams.
+ */
+%let playoff = 36.30625;
+%let nplayoff = 34.68571;
+
+/*
+ * This proc step creates a graph that contains scatter points
+ * for team statistic from each last season(2018-2019).
+ * Winning rate is my independent variable which is x-axis.
+ * Average percentage of 3-point field goals per game is my dependent variable which is y-axis.
+ * Green line represents the mean percentage of 3-point field goals per game for playoff teams.
+ * Black line represents the mean percentage of 3-point field goals per game for non-playoff teams.
+ */
+proc sgplot data=sortwin;
+	title 'Team Season summary (2018-2019)';
+	footnote 'Summary data form basketball-reference.com';
+	scatter x=winrate y=threpp/ group=playoff datalabel=team;
+	yaxis label='Average 3-point field goal(%) per game';
+	refline &nplayoff / axis=y lineattrs=(color=black) label=("&nplayoff");
+	refline &playoff / axis=y lineattrs=(color=green) label=("&playoff");
+	inset 'Average 3-point field goal(%)' /title='Reference line represent:' 
+		titleattrs=(weight=bold) valuealign=center position=topleft 
+		textattrs=(color=blue);
+	inset '   ' '    ' ' Non-playoff team: black'/ position=topleft 
+		textattrs=(color=black);
+	inset '   ' '    ' ' ' ' Playoff team: green'/ position=topleft 
+		textattrs=(color=green);
+run;
+
+/*
+ * The last date step gives a data set follows a
+ * decreasing order on winning rate. In addition,
+ * I created a Rank variable to see the ranking of
+ * the winning rate.
+ */
+data ss;
+	set sortwin;
+	Rank=_n_;
+run;
+
+/*
+ * This proc print step out put the data set that
+ * contains all the variables that I used for this
+ * project. I change them to the correct format and
+ * made some label for these variables.
+ */
+proc print data=ss noobs split='*';
+	id rank;
+	var team age W L Winrate playoff threePA threepp threep;
+	label w="Win" l='Lost' threepp='Percentage 3-point*field goals' 
+		threePA='3-point*Attempts' threep="Numbers of 3-point*field goals";
+	format threepp PERCENT5.1;
+run;
+
+title;
+footnote;
+
+
+data temps;
+input  month1 month2 month3;
+datalines;
+1.2 1.6 2.0
+;
+
+run;
+
+proc sort data= temps out= tempps;
+by  descending month;
+run;
+
+data work.temp;
+text = 'DELIMIT IT';
+post1 = find(text, 'IT','t');
+post2 = find(text, ' IT ','t');
+post3 = find(text, 'it');
+post4 = find(text, 'it','i');
+run;
+
